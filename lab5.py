@@ -1,19 +1,4 @@
-"""Lab 5 - The Wumpus World solved with classifier systems.
 
-The cave is the 4x4 cave of the slides (cave.py). The agent receives only messages and never
-perceives its own square. A classifier is a pair of sets, condition -> action (classifiers.py).
-
-  Solution 1  hand-written classifiers that use messages only: 10 classifiers whose internal
-              messages (has_gold, m1, m2) are the agent's whole memory.
-  Solution 2  a learning classifier system (learning.py): covering and a discounted bucket brigade
-              learn the classifiers from the rewards alone, then a GA simplifies them. The agent's
-              own bookkeeping (dead reckoning) adds x?, y?, facing_?, has_gold/no_gold to every list.
-  Ablations   the same learner with messages only (internal tags instead of the bookkeeping), and
-              the same learner with a GA running while it learns.
-
-Usage:  python lab5.py [--seeds N] [--episodes N] [--quick] [--no-plot]
-        --quick runs fewer seeds and episodes; --no-plot does not write learning_curve.png.
-"""
 import argparse
 import random
 import time
@@ -24,16 +9,14 @@ from cave import EFFECTORS, Cave
 from classifiers import HAND_WRITTEN, run_episode, show
 from learning import DeadReckoning, LearningCS, compact
 
-# What the agent perceives on each square of the slide's cave, top row (y = 4) first.
 SLIDE = [['stench', '-', 'breeze', 'PIT'],
          ['WUMPUS', 'breeze stench glitter', 'PIT', 'breeze'],
          ['stench', '-', 'breeze', '-'],
          ['-', 'breeze', 'PIT', 'breeze']]
-BEST = 988                          # 1000 - 12 actions: see README
+BEST = 988                          
 
 
 def check_cave():
-    """The cave must be the one of the slide; print it."""
     rows = Cave().percept_map()
     assert rows == SLIDE, rows
     for y, row in zip(range(4, 0, -1), rows):
@@ -42,7 +25,6 @@ def check_cave():
 
 
 def check_dead_reckoning(episodes=500, seed=0):
-    """The bookkeeping uses only the agent's own actions and sensors, yet must always match the cave."""
     rng, cave, memory = random.Random(seed), Cave(), DeadReckoning()
     for _ in range(episodes):
         sensors = cave.reset()
@@ -60,8 +42,6 @@ def check_dead_reckoning(episodes=500, seed=0):
 
 
 def print_trace(trace, whole_rule=True):
-    """One row per step. whole_rule=False shows only the winner's action and strength (useful when its
-    condition is the whole message list, as for the classifiers created by covering)."""
     cells = [str(s.winner) if whole_rule else f'{show(s.winner.action)}  strength {s.winner.strength:6.1f}'
              for s in trace]
     w_msgs, w_cell = max(len(show(s.msgs)) for s in trace), max(map(len, cells))
@@ -73,7 +53,6 @@ def print_trace(trace, whole_rule=True):
 
 
 def learn(seed, episodes, generations, test_every=25):
-    """Train one learning classifier system, test it greedily, and simplify its classifiers with the GA."""
     cave, lcs = Cave(), LearningCS(memory=DeadReckoning(), seed=seed)
     scores, tests = [], []
     for e in range(1, episodes + 1):
@@ -82,10 +61,10 @@ def learn(seed, episodes, generations, test_every=25):
             tests.append(lcs.test(cave)[0])
     score, trace = lcs.test(cave)
     assert score == sum(s.reward for s in trace)
-    used = list(dict.fromkeys(s.winner for s in trace))        # the winners, in order of first use
+    used = list(dict.fromkeys(s.winner for s in trace))        
     simple, fitness = compact(used, cave, DeadReckoning(), seed=seed, generations=generations)
-    stable = len(tests)                                         # first checkpoint after which the
-    while stable > 0 and tests[stable - 1] == score:            # greedy score never changes again
+    stable = len(tests)                                         
+    while stable > 0 and tests[stable - 1] == score:            
         stable -= 1
     return SimpleNamespace(seed=seed, score=score, trace=trace, created=len(lcs.rules), used=used,
                            first_win=next((i + 1 for i, s in enumerate(scores) if s > 0), None),
@@ -94,7 +73,6 @@ def learn(seed, episodes, generations, test_every=25):
 
 
 def messages_only(seeds, episodes, tags=(1, 2, 3, 4)):
-    """Ablation: the same learner without bookkeeping; its only memory is the tag every classifier posts."""
     rows = []
     for k in tags:
         greedy, wins = [], []
@@ -107,7 +85,6 @@ def messages_only(seeds, episodes, tags=(1, 2, 3, 4)):
 
 
 def online_ga(seeds, episodes):
-    """Ablation: the learner of Solution 2 with a strength-based GA running while it learns."""
     rows = []
     for seed in seeds:
         cave, lcs = Cave(), LearningCS(memory=DeadReckoning(), seed=seed, online_ga=True)
@@ -118,7 +95,6 @@ def online_ga(seeds, episodes):
 
 
 def plot(results, path, window=50):
-    """Two small multiples: share of seeds whose greedy run is already optimal, and the training score."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -137,7 +113,7 @@ def plot(results, path, window=50):
     left.set_yticks([0, 25, 50, 75, 100], ['0%', '25%', '50%', '75%', '100%'])
     left.set_title(f'Greedy run scores {BEST} (the optimum): share of {n} seeds', loc='left', fontsize=11)
     left.set_xlabel('training episode')
-    stays = len(share)                                  # from this checkpoint on, every seed stays optimal
+    stays = len(share)                                  
     while stays > 0 and share[stays - 1] == 100:
         stays -= 1
     if stays < len(share):
